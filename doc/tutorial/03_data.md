@@ -898,8 +898,8 @@ iteration.
 `h5py.File` objects are not safely pickled across DataLoader workers. This
 dataset preloads arrays in `__init__`, so worker processes receive NumPy arrays,
 not open files. If you switch to lazy loading, open the file inside each worker's
-`__getitem__`, or use one worker on CPU. This is a common source of
-“file already open” errors.
+`__getitem__`, or use one worker in the CPU fallback. This is a common source
+of “file already open” errors.
 
 ---
 

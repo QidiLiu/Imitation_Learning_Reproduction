@@ -37,7 +37,9 @@ We will do two things:
 2. **AIRL on the arm.** A neural reward and an adversarial discriminator make
    MaxEnt IRL tractable in continuous, high-dimensional state spaces.
 
-The gridworld is not a detour. It is the unit test for the theory.
+The gridworld is not a detour. It is the unit test for the theory. It is a
+tabular NumPy lab and therefore runs on the CPU; the arm-based AIRL training in
+this chapter uses the same CUDA default as every other training recipe.
 
 ---
 
@@ -573,7 +575,7 @@ ppo:
   max_grad_norm: 0.5
   target_kl: 0.02
   seed: 0
-  device: auto
+  device: cuda
   out: runs/airl
   eval_every: 0
   eval_episodes: 20

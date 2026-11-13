@@ -149,6 +149,7 @@ import time
 from dataclasses import dataclass, field
 
 import numpy as np
+import torch
 
 from .policies import Policy
 
@@ -176,8 +177,13 @@ def run_episode(env, policy: Policy, seed: int, record: bool = False) -> Episode
     latencies = []
 
     for step in range(env.cfg.episode_steps):
+        # CUDA kernels are asynchronous; synchronize before timing inference.
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
         start = time.perf_counter()
         action = np.asarray(policy.act(obs), dtype=np.float32).reshape(-1)
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
         latencies.append((time.perf_counter() - start) * 1000.0)
 
         obs, reward, terminated, truncated, info = env.step(action)
@@ -243,6 +249,8 @@ separately as `latency + env.step`.
 
 - Call `policy.act` with the same observation sequence; do not sample actions
   from a distribution.
+- On CUDA, synchronize before and after `policy.act` when measuring latency;
+  otherwise you time kernel launches, not execution.
 - For diffusion policies, use a fixed initial noise seed per episode if you want
   exact reproducibility; otherwise the sampler is stochastic. Report that.
 - For ACT, set the CVAE latent to zero (the prior mean) at inference.
@@ -350,6 +358,7 @@ from imitation_learning_reproduction.envs.push_arm import PushArmConfig, PushArm
 from imitation_learning_reproduction.eval.metrics import summarize
 from imitation_learning_reproduction.eval.policies import ExpertPolicy, RandomPolicy
 from imitation_learning_reproduction.eval.rollout import evaluate_policy
+from imitation_learning_reproduction.utils.seed import resolve_device
 
 
 def build_env(obs_mode: str, visual_variant: str, image_size: int, n_points: int):
@@ -371,8 +380,10 @@ def main() -> None:
     parser.add_argument("--n-points", type=int, default=512)
     parser.add_argument("--episodes", type=int, default=50)
     parser.add_argument("--seed", type=int, default=10_000)
+    parser.add_argument("--device", default="cuda", choices=["cuda", "cpu", "auto"])
     parser.add_argument("--out", type=str, default=None)
     args = parser.parse_args()
+    device = resolve_device(args.device)
 
     if args.policy == "random":
         policy = RandomPolicy(seed=args.seed)
@@ -382,7 +393,7 @@ def main() -> None:
         if args.checkpoint is None:
             raise SystemExit("--checkpoint is required with --policy checkpoint")
         from imitation_learning_reproduction.eval.policies import load_policy
-        policy = load_policy(args.checkpoint)
+        policy = load_policy(args.checkpoint, device=device)
 
     env = build_env(args.obs_mode, args.visual_variant, args.image_size, args.n_points)
     seeds = [args.seed + i for i in range(args.episodes)]
@@ -406,17 +417,21 @@ if __name__ == "__main__":
 registry and add branches as policies appear:
 
 ```python
-def load_policy(checkpoint_path: str):
+def load_policy(checkpoint_path: str, device: str = "cuda"):
     import torch
     ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     algo = ckpt["algorithm"]
     if algo == "bc":
         from imitation_learning_reproduction.eval.policies import BCPolicy
-        return BCPolicy.from_checkpoint(ckpt)
+        return BCPolicy.from_checkpoint(ckpt).to(device)
     if algo == "act":
         ...
     raise ValueError(f"unknown algorithm {algo!r}")
 ```
+
+`map_location="cpu"` is only a portable checkpoint-loading choice; the policy is
+then moved to `device`. The default `device` for evaluation is CUDA, matching
+training. Pass `--device cpu` only for a smoke test.
 
 Do not put the model construction in `evaluate.py`; it will become an
 unmaintainable switch. Each policy class knows how to load its own checkpoint.

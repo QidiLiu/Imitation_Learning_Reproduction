@@ -73,7 +73,8 @@ x_{t-1}  = √(ᾱ_{t-1}) x_0^pred + √(1-ᾱ_{t-1}) ε_θ
 ```
 
 Use 100 training steps and 10 DDIM inference steps. This is the standard
-Diffusion Policy configuration and is fast enough for CPU evaluation.
+Diffusion Policy configuration and is fast enough for real-time evaluation on a
+CUDA GPU.
 
 ---
 
@@ -466,7 +467,8 @@ Evaluate the EMA copy, not the raw model.
 ```python
 dataset = DemoDataset(root, split="train", obs_horizon=2, action_horizon=16,
                       keys=("state", "image"))
-loader = DataLoader(dataset, batch_size=64, shuffle=True, num_workers=0)
+loader = DataLoader(dataset, batch_size=64, shuffle=True, num_workers=4,
+                    pin_memory=(device.type == "cuda"))
 
 model = DiffusionPolicy().to(device)
 model.set_normalizers(
@@ -521,7 +523,7 @@ Policy.
 data:
   root: data/push_arm
   batch_size: 64
-  num_workers: 0
+  num_workers: 4
 model:
   obs_horizon: 2
   horizon: 16
@@ -537,7 +539,7 @@ train:
   grad_clip: 1.0
   ema_decay: 0.999
   seed: 0
-  device: auto
+  device: cuda
   out: runs/dp
   val_every: 500
 eval:
@@ -566,7 +568,7 @@ from imitation_learning_reproduction.training.normalizer import (
 
 class DPPolicy:
     def __init__(self, model, stats, obs_horizon=2, execute_horizon=8,
-                 num_inference_steps=10, device="cpu"):
+                 num_inference_steps=10, device="cuda"):
         self.model = model.to(device).eval()
         self.device = device
         self.obs_horizon = obs_horizon

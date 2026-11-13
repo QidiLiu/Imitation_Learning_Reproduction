@@ -389,8 +389,9 @@ break.
    action shapes you had to adapt.
 2. Export 10 PlanarPush episodes to LeRobot format and load them back. Verify
    that the actions and images match.
-3. Measure the inference latency of ACT and DP on your CPU. How many control
-   steps can you execute per inference at 20 Hz?
+3. Measure the inference latency of ACT and DP on your deployment device
+   (CUDA GPU by default). How many control steps can you execute per inference
+   at 20 Hz?
 4. Write a one-page sim-to-real risk register for an SO-101 pick-and-place task.
 
 ---

@@ -20,9 +20,15 @@ uv run python -V
 uv run python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
 ```
 
-At the time of writing this project uses Python 3.14 and PyTorch 2.15. The
-tutorial is CPU-first; on this machine `torch.cuda.is_available()` is `False`,
-which is fine. All core experiments fit in the reduced configurations.
+At the time of writing this project uses Python 3.14 and PyTorch 2.15. **All
+training configs in this tutorial default to CUDA.** A CUDA-capable GPU is the
+expected environment. CPU is supported only as an explicit fallback for smoke
+tests and CI; the scripts do not silently fall back.
+
+If the command above prints `False`, install a CUDA-enabled PyTorch build that
+matches your driver, or set `device: cpu` explicitly and treat that run as a
+smoke test rather than a benchmark. See the PyTorch installation selector for the
+correct CUDA wheel.
 
 Do **not** create a new virtual environment. `uv run` uses `.venv` and keeps the
 lockfile in sync.
@@ -298,7 +304,7 @@ from imitation_learning_reproduction.utils.config import apply_overrides, load_c
 @dataclass
 class TrainConfig:
     seed: int = 0
-    device: str = "auto"
+    device: str = "cuda"
     lr: float = 1e-3
 
 @dataclass
@@ -410,10 +416,17 @@ def seed_everything(seed: int, deterministic_torch: bool = False) -> None:
         torch.backends.cudnn.deterministic = True
 
 
-def resolve_device(requested: str = "auto") -> torch.device:
+def resolve_device(requested: str = "cuda") -> torch.device:
+    """Resolve the training device. CUDA is the default; CPU is explicit only."""
     if requested == "auto":
         requested = "cuda" if torch.cuda.is_available() else "cpu"
-    return torch.device(requested)
+    device = torch.device(requested)
+    if device.type == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError(
+            "CUDA was requested but is not available. Install a CUDA-enabled "
+            "PyTorch build, or pass device='cpu' only for smoke tests."
+        )
+    return device
 ```
 
 Use `deterministic_torch=False` by default. Deterministic cuDNN kernels can be
@@ -421,9 +434,10 @@ much slower and occasionally unavailable for an operation. Reproducibility of
 the *experiment* is usually sufficient; bitwise reproducibility of a GPU kernel
 is a different, stricter goal.
 
-DataLoader workers are another source of nondeterminism. With the small dataset
-in this project, use `num_workers=0` on CPU. On a GPU, if you use workers, seed
-them with a `worker_init_fn` or accept run-to-run variation.
+DataLoader workers are another source of nondeterminism. The CUDA default uses
+`num_workers=4` and `pin_memory=True`. If you fall back to CPU for a smoke test,
+use `num_workers=0`. If you use workers on either device, seed them with a
+`worker_init_fn` or accept run-to-run variation.
 
 ---
 
@@ -438,9 +452,10 @@ On Linux servers and CI machines there are three common backends:
 | `osmesa` | `libOSMesa` | Pure software, slower, sometimes unavailable |
 | `glfw` | X11/Wayland display | Use on a desktop with `DISPLAY` set |
 
-On this machine `egl` works through Mesa's software EGL even though
-`nvidia-smi` is unavailable. `glfw` fails because there is no usable GL context;
-`osmesa` is not installed. Test all three before committing to one:
+On a headless CUDA machine, EGL normally uses the NVIDIA driver; on a CPU-only
+machine it can fall back to Mesa software EGL. `glfw` requires an X11/Wayland
+display, and `osmesa` may not be installed. Test the backend on the machine that
+will run data collection before committing to it:
 
 ```bash
 MUJOCO_GL=egl uv run python -c "
@@ -509,7 +524,7 @@ scene is a common source of stale images.
 Create `tests/test_smoke.py`. It should prove four things:
 
 1. The dependencies import.
-2. Torch works on the selected device.
+2. Torch works and CUDA is available for training (or is explicitly skipped for a CPU smoke test).
 3. MuJoCo can render a non-empty image headlessly.
 4. The config utility round-trips a nested dataclass.
 
@@ -519,6 +534,7 @@ from dataclasses import dataclass, field
 
 import mujoco
 import numpy as np
+import pytest
 import torch
 
 from imitation_learning_reproduction.utils.seed import resolve_device, seed_everything
@@ -526,9 +542,11 @@ from imitation_learning_reproduction.utils.seed import resolve_device, seed_ever
 
 def test_torch_works():
     seed_everything(0)
-    x = torch.randn(4, 3)
-    y = torch.randn(3, 2)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    x = torch.randn(4, 3, device=device)
+    y = torch.randn(3, 2, device=device)
     assert torch.allclose(x @ y, (y.T @ x.T).T, atol=1e-6)
+    assert x.device.type == device.type
 
 
 def test_mujoco_render():
@@ -555,6 +573,17 @@ def test_mujoco_render():
 
 def test_device_resolution():
     assert resolve_device("cpu").type == "cpu"
+    if torch.cuda.is_available():
+        assert resolve_device("cuda").type == "cuda"
+    else:
+        with pytest.raises(RuntimeError):
+            resolve_device("cuda")
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(),
+                    reason="CUDA is the training default; run this on a CUDA machine")
+def test_cuda_device():
+    assert resolve_device("cuda").type == "cuda"
 ```
 
 Run:

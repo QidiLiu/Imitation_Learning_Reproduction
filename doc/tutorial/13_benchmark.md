@@ -71,7 +71,7 @@ Add metadata by hand or in the evaluation script:
   "method": "act",
   "checkpoint": "runs/act/20261112-214000/best.pt",
   "params": 812345,
-  "train_minutes": 38,
+  "train_minutes_cuda": 38,
   "git_commit": "abc1234",
   "selection": "best val loss"
 }
@@ -79,7 +79,7 @@ Add metadata by hand or in the evaluation script:
 
 The final table:
 
-| Method | Obs | Params | Train time | Success (95% CI) | Final dist | Min dist | Latency |
+| Method | Obs | Params | Train time (CUDA) | Success (95% CI) | Final dist | Min dist | Latency (ms, CUDA) |
 |---|---|---:|---:|---|---:|---:|---:|
 | Random | state | 0 | — | 0.02 (0.00–0.07) | — | — | — |
 | Expert | state | 0 | — | 0.62 (0.48–0.74) | — | — | — |
@@ -93,8 +93,10 @@ The final table:
 | DP | image | 2.0M | 45 min | TODO | TODO | TODO | TODO |
 | DP3 | point cloud | 1.6M | 35 min | TODO | TODO | TODO | TODO |
 
-Numbers are illustrative; measure your own. Use the same hardware for latency
-comparisons, and warm up the model before timing.
+Numbers are illustrative; measure your own. Use the same CUDA GPU for latency
+comparisons, warm up the model before timing, and synchronize around CUDA
+inference (chapter 04) so you measure kernel execution rather than launch
+overhead.
 
 ### Aggregating the JSONs
 
@@ -207,7 +209,7 @@ from __future__ import annotations
 import torch
 
 
-def load_policy(path: str):
+def load_policy(path: str, device: str = "cuda"):
     ckpt = torch.load(path, map_location="cpu", weights_only=False)
     algo = ckpt["algorithm"]
     stats = ckpt.get("stats")
@@ -231,20 +233,22 @@ def load_policy(path: str):
             model.set_normalizers(state_norm(), action_norm())
             model.load_state_dict(ckpt["model"])
             model.eval()
-            return model
+            return model.to(device)
         model = BCPolicy.from_checkpoint(ckpt)
-        return model
+        return model.to(device)
 
     if algo == "act":
         from imitation_learning_reproduction.models.act import ACT
         model = ACT(**model_config)
         model.set_normalizers(state_norm(), action_norm())
         model.load_state_dict(ckpt["model"])
+        model.to(device)
         return ACTPolicy(
             model, stats,
             obs_horizon=ckpt.get("obs_horizon", 2),
             execute_horizon=ckpt.get("execute_horizon", 8),
             temporal_ensemble=ckpt.get("temporal_ensemble", True),
+            device=device,
         )
 
     if algo == "dp":
@@ -252,11 +256,13 @@ def load_policy(path: str):
         model = DiffusionPolicy(**model_config)
         model.set_normalizers(state_norm(), action_norm())
         model.load_state_dict(ckpt["model"])
+        model.to(device)
         return DPPolicy(
             model, stats,
             obs_horizon=ckpt.get("obs_horizon", 2),
             execute_horizon=ckpt.get("execute_horizon", 8),
             num_inference_steps=ckpt.get("num_inference_steps", 10),
+            device=device,
         )
 
     if algo == "dp3":
@@ -264,18 +270,20 @@ def load_policy(path: str):
         model = DP3Policy(**model_config)
         model.set_normalizers(state_norm(), action_norm())
         model.load_state_dict(ckpt["model"])
+        model.to(device)
         return DP3EvalPolicy(
             model, stats,
             obs_horizon=ckpt.get("obs_horizon", 2),
             execute_horizon=ckpt.get("execute_horizon", 8),
             num_inference_steps=ckpt.get("num_inference_steps", 10),
+            device=device,
         )
 
     if algo in {"ppo", "airl", "gail", "apprenticeship"}:
         from imitation_learning_reproduction.rl.ppo import (
             ActorCritic, RunningMeanStd,
         )
-        actor = ActorCritic(**model_config)
+        actor = ActorCritic(**model_config).to(device)
         actor.load_state_dict(ckpt["model"])
         obs_rms = RunningMeanStd.from_state_dict(ckpt["obs_rms"])
         return PPOActorPolicy(actor, obs_rms)
@@ -285,7 +293,10 @@ def load_policy(path: str):
 
 `PPOActorPolicy`, `ACTPolicy`, `DPPolicy` and `DP3EvalPolicy` all live in
 `eval/policies.py`; the registry refers to them directly. Keep that file focused
-on adapters and checkpoint loading, not on training.
+on adapters and checkpoint loading, not on training. The default evaluation
+device is CUDA, matching training. `map_location="cpu"` is only the portable
+checkpoint-loading step; the model is moved to `device` immediately afterwards.
+Pass `--device cpu` only for a smoke test.
 
 The image-BC branch loads `ImageBCPolicy` directly; its `act` method is defined in
 chapter 05. If you add a new policy type, add exactly one branch here and one
@@ -364,8 +375,9 @@ can hurt if the object points are a small fraction and the encoder overfits.
 
 ### Report the compute
 
-Every ablation costs time. Include a table of GPU/CPU hours. A result that is 2
-points better at 10× compute is a different claim from a free improvement.
+Every ablation costs time. Include a table of CUDA GPU hours, and report CPU
+fallback hours separately if you use them. A result that is 2 points better at
+10× compute is a different claim from a free improvement.
 
 ---
 

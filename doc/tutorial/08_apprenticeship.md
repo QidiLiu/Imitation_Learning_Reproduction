@@ -444,7 +444,7 @@ ppo:
   max_grad_norm: 0.5
   target_kl: 0.02
   seed: 0
-  device: auto
+  device: cuda
   out: runs/apprenticeship
 gamma: 0.99
 outer_iters: 6

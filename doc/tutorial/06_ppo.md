@@ -358,7 +358,7 @@ class PPOConfig:
     max_grad_norm: float = 0.5
     target_kl: float = 0.02
     seed: int = 0
-    device: str = "auto"
+    device: str = "cuda"
     out: str = "runs/ppo"
     eval_every: int = 10
     eval_episodes: int = 20
@@ -552,7 +552,7 @@ train:
   max_grad_norm: 0.5
   target_kl: 0.02
   seed: 0
-  device: auto
+  device: cuda
   out: runs/ppo
   eval_every: 10
   eval_episodes: 20
@@ -565,8 +565,9 @@ uv run python scripts/train_ppo.py --config configs/ppo.yaml
 ```
 
 With 8 envs, 1024 steps and 60 iterations, this collects about 491k transitions.
-On a CPU it should finish in minutes; the exact time depends on MuJoCo stepping
-and the number of threads.
+On a CUDA GPU it should finish in a few minutes; the exact time depends on
+MuJoCo stepping, the CPU/GPU split, and the number of environments. The CPU
+fallback is much slower and is only for smoke tests.
 
 Expected: success rises from near zero to **60–85%**. If PPO is stuck:
 

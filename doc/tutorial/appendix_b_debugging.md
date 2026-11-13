@@ -121,7 +121,8 @@ successful finalize. A half-written HDF5 is worse than no dataset.
 | All actions constant | Action normaliser degenerate; policy collapsed to mean |
 | Gradients zero | Detached tensor in the loss; `torch.no_grad` around training |
 | CUDA OOM | Batch too large; image resolution; activation checkpointing |
-| Slow CPU | Too many threads contending; large images; no `torch.no_grad` at eval |
+| Slow training (CPU fallback) | Too many threads contending; large images; no `torch.no_grad` at eval |
+| `CUDA requested but not available` | Install a CUDA-enabled PyTorch build, or pass `device: cpu` for a smoke test |
 | Different results each run | Seeds not set; DataLoader workers; nondeterministic kernels |
 
 ### Print one batch, always
@@ -199,22 +200,24 @@ reproduces the training actions approximately. If not, the sampler is wrong.
 
 ## B.8 Performance
 
-### CPU
-
-- Set `torch.set_num_threads(4–8)`; more threads can contend on small models.
-- Use `num_workers=0` for small datasets; worker startup dominates.
-- Render at 96×96, not 480×640, unless the task needs it.
-- Reuse the MuJoCo `Renderer`; creating one per step is expensive.
-- Render RGB and depth in one function, but only for data collection.
-- Use `torch.no_grad()` for all evaluation and feature extraction.
-
-### GPU
+### CUDA (default)
 
 - `pin_memory=True`, `num_workers=4`, `persistent_workers=True`.
 - Mixed precision for vision models; check that GroupNorm and diffusion
   schedulers remain stable.
 - Move the batch to the device once, not per key.
 - Use `channels_last` for CNN-heavy models if supported.
+- Keep the MuJoCo simulation on the CPU; move only tensors to the GPU. Vectorised
+  environments are CPU-bound and do not benefit from `cuda` MuJoCo here.
+- Profile `policy.act` separately from `env.step`; the GPU may be idle while the
+  simulator steps.
+
+### CPU fallback (smoke tests only)
+
+- Set `torch.set_num_threads(4–8)`; more threads can contend on small models.
+- Use `num_workers=0` for small datasets; worker startup dominates.
+- Expect visual policy training to be much slower than the CUDA default.
+- Do not report CPU-fallback training times as GPU benchmark numbers.
 
 ### Profiling
 

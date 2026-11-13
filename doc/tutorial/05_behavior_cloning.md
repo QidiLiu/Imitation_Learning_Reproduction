@@ -271,7 +271,7 @@ from imitation_learning_reproduction.utils.seed import resolve_device, seed_ever
 class DataConfig:
     root: str = "data/push_arm"
     batch_size: int = 256
-    num_workers: int = 0
+    num_workers: int = 4
 
 
 @dataclass
@@ -287,7 +287,7 @@ class TrainConfig:
     weight_decay: float = 1e-4
     grad_clip: float = 1.0
     seed: int = 0
-    device: str = "auto"
+    device: str = "cuda"
     out: str = "runs/bc"
     val_every: int = 5
     eval_episodes: int = 20
@@ -318,10 +318,12 @@ def main() -> None:
 
     train_ds = make_dataset(cfg, "train")
     val_ds = make_dataset(cfg, "val")
+    pin_memory = device.type == "cuda"
     train_loader = DataLoader(train_ds, batch_size=cfg.data.batch_size, shuffle=True,
-                              num_workers=cfg.data.num_workers, drop_last=False)
+                              num_workers=cfg.data.num_workers, drop_last=False,
+                              pin_memory=pin_memory)
     val_loader = DataLoader(val_ds, batch_size=cfg.data.batch_size, shuffle=False,
-                            num_workers=cfg.data.num_workers)
+                            num_workers=cfg.data.num_workers, pin_memory=pin_memory)
 
     stats = train_ds.stats
     state_normalizer = StateNormalizer(torch.tensor(stats.state_mean),
@@ -419,7 +421,7 @@ a premature abstraction would be harder to read.
 data:
   root: data/push_arm
   batch_size: 256
-  num_workers: 0
+  num_workers: 4
 
 model:
   kind: state
@@ -431,7 +433,7 @@ train:
   weight_decay: 0.0001
   grad_clip: 1.0
   seed: 0
-  device: auto
+  device: cuda
   out: runs/bc
   val_every: 5
   eval_episodes: 20

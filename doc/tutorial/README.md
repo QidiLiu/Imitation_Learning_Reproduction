@@ -24,13 +24,20 @@ A deliberately small but physically meaningful benchmark called **PlanarPush**:
 | Observations | 18-D proprioceptive state, 96×96 top RGB, 512-point cloud |
 | Episodes | Up to 60 control steps (3 s), terminate on success |
 | Demonstrations | Scripted expert, successful episodes filtered, stored in HDF5 |
-| Compute | CPU-first; a GPU is optional |
+| Compute | CUDA-first; CPU is an explicit smoke-test fallback |
 
 The 2-DoF arm is intentional. It is large enough to contain the hard parts of
 imitation learning — continuous control, contact, partial observability from a
 camera, multimodal human-like behaviour — but small enough that every experiment
-finishes on a laptop CPU. The algorithms do not care that the arm has two joints;
-the same code scales to a 6-DoF arm by changing the environment and dimensions.
+finishes quickly on a single CUDA GPU. The algorithms do not care that the arm
+has two joints; the same code scales to a 6-DoF arm by changing the environment
+and dimensions.
+
+**Branch note.** This repository has two branches: `main` holds the tutorial and
+environment scaffolding only; `reproduction` is where you hand-write the
+implementation. The tutorial text is shared by both. Use
+`git switch reproduction` before creating code, and `git switch main` when you
+want a clean reading branch.
 
 ### The algorithms
 
@@ -80,9 +87,11 @@ separate imitation-learning method.
 | [A](appendix_a_math.md) | Derivations and notation | reference | — |
 | [B](appendix_b_debugging.md) | Debugging, performance, reproducibility | reference | — |
 
-Compute for the full core path is roughly 4–8 CPU hours if you use the reduced
-configs in the chapters. Visual policy training dominates. The details depend on
-your CPU and on how many ablations you run.
+Compute for the full core path is a few CUDA GPU hours on a modern GPU
+(roughly 1–4 hours with the reduced configs, depending on the GPU and how many
+ablations you run). Visual policy training dominates. The CPU fallback is much
+slower and is intended only for smoke tests; benchmark numbers should be produced
+with CUDA.
 
 ---
 
@@ -338,8 +347,10 @@ Start with these; each chapter adds specific references.
 
 ## 10. Validation notes
 
-While preparing the tutorial I validated the core simulation assumptions on this
-machine (Linux, CPU-only, Python 3.14, MuJoCo 4.0.1):
+While preparing the tutorial I validated the core simulation assumptions with a
+CPU-only renderer/geometry prototype (Linux, Python 3.14, MuJoCo 4.0.1). This
+does not change the training default: every training recipe in the tutorial uses
+CUDA, and CPU is only an explicit fallback.
 
 - EGL headless rendering at 96×96 works through Mesa when `MUJOCO_GL=egl`;
   `glfw` does not work without a display and OSMesa is not installed.

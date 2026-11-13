@@ -33,8 +33,8 @@ ACT combines three ideas:
 3. **Action chunking + temporal ensembling** at inference.
 
 The original ACT uses a ResNet18 backbone and a DETR-style transformer. We use a
-small convolutional tokenizer and a compact transformer so the model trains on a
-CPU. The algorithmic pieces are the same.
+small convolutional tokenizer and a compact transformer so the model trains
+comfortably on a single CUDA GPU. The algorithmic pieces are the same.
 
 ---
 
@@ -82,7 +82,7 @@ class ConvTokenizer(nn.Module):
 
 At 96×96, the output is 12×12 = 144 tokens per frame. With two frames, the
 transformer memory is 288 tokens plus two state tokens. That is small enough for
-CPU attention.
+attention even on a modest GPU.
 
 ### 2.3 Full model
 
@@ -363,8 +363,9 @@ for step in range(1, steps + 1):
     scheduler.step()
 ```
 
-Use a batch size of 32–64 on CPU. For 100 demonstrations, 2,000–4,000 steps is
-enough. Save the checkpoint with the model config, stats, and step:
+With the CUDA default, use a batch size of 32–64. For 100 demonstrations,
+2,000–4,000 steps is enough. Save the checkpoint with the model config, stats, and
+step:
 
 ```python
 import dataclasses
@@ -394,7 +395,7 @@ the checkpoint and restored by `ACTPolicy`.
 data:
   root: data/push_arm
   batch_size: 32
-  num_workers: 0
+  num_workers: 4
 model:
   obs_horizon: 2
   chunk_size: 16
@@ -412,7 +413,7 @@ train:
   max_kl: 10.0
   kl_anneal_steps: 1000
   seed: 0
-  device: auto
+  device: cuda
   out: runs/act
   val_every: 250
 eval:
@@ -500,7 +501,7 @@ from imitation_learning_reproduction.training.normalizer import (
 
 class ACTPolicy:
     def __init__(self, model, stats, obs_horizon=2, execute_horizon=8,
-                 temporal_ensemble=True, device="cpu"):
+                 temporal_ensemble=True, device="cuda"):
         self.model = model.to(device).eval()
         self.device = device
         self.obs_horizon = obs_horizon
