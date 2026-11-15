@@ -1,17 +1,46 @@
 [project]
 name = "imitation-learning-reproduction"
 version = "0.1.0"
-description = "Add your description here"
+description = "From-scratch imitation learning on a small MuJoCo arm"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "gymnasium>=1.4,<2",
+    "h5py>=3.16",
+    "imageio>=2.38",
+    "matplotlib>=3.10",
+    "mujoco>=4.0,<5",
+    "numpy>=2.2",
+    "pyyaml>=6.0",
+    "tensorboard>=2.20",
     "torch>=2.15.0",
     "torchvision>=0.29.2",
+    "tqdm>=4.70",
 ]
 
 [project.scripts]
-imitation-learning-reproduction = "imitation_learning_reproduction:main"
+ilr-check = "imitation_learning_reproduction.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "slow: tests that train or render for more than a few seconds",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
 
 [build-system]
 requires = ["uv_build>=0.13.7,<0.14.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0",
+    "ruff>=0.14",
+]
