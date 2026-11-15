@@ -1,5 +1,18 @@
 # Imitation Learning Reproduction
 
+> **Where is the reproduction?**
+> `main` (the default branch) contains **only the tutorial** and the environment
+> scaffolding — there is no implementation here. The reproduction contents live
+> **only on the [`reproduction` branch](https://github.com/QidiLiu/Imitation_Learning_Reproduction/tree/reproduction)**.
+>
+> ```bash
+> git switch reproduction   # read and run the reproduction
+> git switch main           # read the tutorial
+> ```
+>
+> If you are following the tutorial, stay on `main` and implement each chapter
+> yourself; switch to `reproduction` to compare with the working implementation.
+
 A tutorial-driven, from-scratch reproduction of seven imitation-learning
 algorithms on one small MuJoCo robotic-arm task:
 
@@ -31,24 +44,18 @@ math and model code, plus acceptance tests.
 
 ## Repository branches
 
-- **`main`** contains only the tutorial (this README plus `doc/tutorial/`) and
-  the environment scaffolding (`pyproject.toml`, `uv.lock`, `.python-version`,
-  the placeholder source package). It is the reading/reference branch.
-- **`reproduction`** is the working branch for the hand-written implementation
-  of every algorithm. The reproduction code belongs there, not on `main`.
+| Branch | What it contains |
+|---|---|
+| **`main`** (default) | **The tutorial only**: this README, [`doc/tutorial/`](doc/tutorial/README.md), and the environment scaffolding (`pyproject.toml`, `uv.lock`, `.python-version`, the placeholder source package). It does **not** contain the reproduction. |
+| **`reproduction`** | **The reproduction**: the hand-written implementation under `src/`, its tests, and the same shared tutorial. |
 
-```bash
-git switch reproduction   # write code here
-git switch main           # read the tutorial
-```
-
-The tutorial itself is shared by both branches; use `git switch` rather than
+The tutorial text is shared by both branches; use `git switch` rather than
 copying documentation between branches.
 
 ## Repository status
 
 - The tutorial is complete (chapters 01–14, appendices A–B).
-- The implementation lives on `reproduction`; `main` stays tutorial-only.
+- `main` is tutorial-only; the implementation lives **only** on `reproduction`.
 - The `uv` environment in this repository is the one to use:
 
 ```bash
