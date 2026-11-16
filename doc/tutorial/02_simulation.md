@@ -783,7 +783,7 @@ def backproject(
 
     fy = height / (2.0 * np.tan(np.deg2rad(fovy_deg) / 2.0))
     fx = fy
-    cx, cy = width / 2.0, height / 2.0
+    cx, cy = (width - 1) / 2.0, (height - 1) / 2.0
 
     v, u = np.mgrid[0:height, 0:width].astype(np.float64)
     z = depth
