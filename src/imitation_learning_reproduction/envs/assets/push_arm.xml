@@ -1,0 +1,90 @@
+<mujoco model="push_arm">
+  <compiler angle="radian" autolimits="true"/>
+  <option timestep="0.002" integrator="implicitfast" cone="elliptic" impratio="10"/>
+
+  <visual>
+    <global offwidth="96" offheight="96"/>
+    <quality shadowsize="1024"/>
+    <map znear="0.01" zfar="5"/>
+  </visual>
+
+  <asset>
+    <material name="table" rgba="0.28 0.30 0.35 1" specular="0.05" shininess="0.1"/>
+    <material name="arm"   rgba="0.75 0.76 0.80 1" specular="0.30" shininess="0.4"/>
+    <material name="base"  rgba="0.18 0.19 0.22 1" specular="0.10" shininess="0.1"/>
+    <material name="tool"  rgba="0.15 0.35 0.85 1" specular="0.20" shininess="0.2"/>
+    <material name="puck"  rgba="0.95 0.55 0.12 1" specular="0.30" shininess="0.3"/>
+    <material name="goal"  rgba="0.15 0.85 0.35 1" specular="0.20" shininess="0.2"/>
+  </asset>
+
+  <worldbody>
+    <light name="key"  pos="0 0 2.2"   dir="0 0 -1"      diffuse="0.55 0.55 0.55" specular="0.10 0.10 0.10"/>
+    <light name="fill" pos="1.2 0.8 1.6" dir="-1 -0.7 -1" diffuse="0.35 0.35 0.35" specular="0.10 0.10 0.10"/>
+
+    <!-- Fixed top-down camera and a translated camera used for robustness tests. -->
+    <camera name="top"       pos="0.05 0 1.15"  xyaxes="1 0 0 0 1 0" fovy="50"/>
+    <camera name="top_shift" pos="0.17 0.08 1.15" xyaxes="1 0 0 0 1 0" fovy="50"/>
+
+    <geom name="table" type="plane" size="1.0 1.0 0.1" material="table"/>
+
+    <body name="base" pos="-0.38 0 0.06">
+      <geom name="base_geom" type="cylinder" size="0.07 0.03" pos="0 0 -0.03"
+            material="base" contype="0" conaffinity="0"/>
+
+      <body name="link1" pos="0 0 0">
+        <joint name="joint1" type="hinge" axis="0 0 1" range="-3.0 3.0"
+               damping="0.4" armature="0.01"/>
+        <geom name="link1_geom" type="capsule" fromto="0 0 0 0.28 0 0" size="0.018"
+              material="arm" contype="0" conaffinity="0"/>
+
+        <body name="link2" pos="0.28 0 0">
+          <joint name="joint2" type="hinge" axis="0 0 1" range="-2.9 2.9"
+                 damping="0.4" armature="0.01"/>
+          <geom name="link2_geom" type="capsule" fromto="0 0 0 0.38 0 0" size="0.016"
+                material="arm" contype="0" conaffinity="0"/>
+
+          <!-- Tool: a paddle whose flat face is perpendicular to the link. -->
+          <geom name="pusher" type="box" size="0.006 0.045 0.03" pos="0.39 0 -0.02"
+                material="tool"/>
+
+          <site name="ee" pos="0.38 0 0" size="0.012" rgba="1 0 0 1"/>
+        </body>
+      </body>
+    </body>
+
+    <body name="puck" pos="0.10 0 0.025">
+      <freejoint name="puck_free"/>
+      <geom name="puck_geom" type="cylinder" size="0.035 0.025" material="puck"
+            density="600" friction="0.8 0.02 0.001"/>
+    </body>
+
+    <body name="goal" pos="0.30 0.10 0">
+      <geom name="goal_disc" type="cylinder" size="0.06 0.002" pos="0 0 0.002"
+            material="goal" contype="0" conaffinity="0"/>
+      <geom name="goal_post" type="cylinder" size="0.008 0.05" pos="0 0 0.05"
+            material="goal" contype="0" conaffinity="0"/>
+      <geom name="goal_top"  type="sphere" size="0.018" pos="0 0 0.10"
+            material="goal" contype="0" conaffinity="0"/>
+    </body>
+
+    <!-- Visual-only distractors, parked below the table by default. -->
+    <body name="distractor1" pos="0 0 -5">
+      <geom name="distractor1_geom" type="box" size="0.03 0.03 0.03"
+            rgba="0.8 0.2 0.2 1" contype="0" conaffinity="0"/>
+    </body>
+    <body name="distractor2" pos="0 0 -5">
+      <geom name="distractor2_geom" type="box" size="0.025 0.04 0.02"
+            rgba="0.2 0.4 0.9 1" contype="0" conaffinity="0"/>
+    </body>
+    <body name="distractor3" pos="0 0 -5">
+      <geom name="distractor3_geom" type="sphere" size="0.03"
+            rgba="0.9 0.8 0.1 1" contype="0" conaffinity="0"/>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <position name="act1" joint="joint1" kp="120" kv="3.0" ctrlrange="-3.0 3.0"/>
+    <position name="act2" joint="joint2" kp="120" kv="3.0" ctrlrange="-2.9 2.9"/>
+  </actuator>
+</mujoco>
+
